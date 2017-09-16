@@ -11,3 +11,7 @@ default:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 endif
+
+.PHONY: clean
+clean:
+	-rm -f *.o *.ko *.mod.c *.symvers *.order
