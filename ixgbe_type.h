@@ -31,12 +31,5 @@
 #define IXGBE_DEV_ID_82599_QSFP_SF_QP    0x1558
 
 enum ixgbe_boards {
-	board_82598,
 	board_82599,
-	board_X540,
-	board_X550,
-	board_X550EM_x,
-	board_x550em_x_fw,
-	board_x550em_a,
-	board_x550em_a_fw,
 };
