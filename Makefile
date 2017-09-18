@@ -1,5 +1,7 @@
 CONFIG_MODULE_SIG=n
 ifneq ($(KERNELRELEASE),)
+subdir-ccflags-y = -I$(PWD)/inc
+
 	obj-m			:= ixgbe.o
 
 ixgbe-objs	:= ixgbe_main.o

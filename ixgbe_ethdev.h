@@ -4,6 +4,8 @@
 #include <linux/types.h>
 
 #include "ixgbe_type.h"
+#include "ixgbe_dcb.h"
+#include <ix/net/ethdev.h>
 
 /* need update link, bit flag */
 #define IXGBE_FLAG_NEED_LINK_UPDATE (uint32_t)(1 << 0)
@@ -37,9 +39,6 @@
 #define MAX_RX_QUEUES	64		// TODO I don't know if it is the right value here, copied from linux/ixgbe
 #define MAX_TX_QUEUES	64
 
-// put here temperarily
-#define ETH_ADDR_LEN 6
-#define ETH_VMDQ_NUM_MIRROR_RULE 4
 /*
  * Information about the fdir mode.
  */
