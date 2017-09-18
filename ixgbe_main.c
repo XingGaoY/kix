@@ -10,6 +10,7 @@
 #include <linux/pci.h>		// for pci structures
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/dma-mapping.h>
 
 #include "ixgbe_type.h"
 #include "ixgbe.h"
@@ -67,7 +68,10 @@ MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
  */
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 	struct net_device *netdev;
+	struct ixgbe_adapter *adapter = NULL;
 	unsigned int indices = MAX_TX_QUEUES;
+	int pci_using_dac, err;
+	bool disable_dev = false;
 
 	if (pdev->is_virtfn) {
 		printk(KERN_ERR "%s (%hx:%hx) should not be a VF!\n",
@@ -80,17 +84,31 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 
 	pci_addr_tlb[pci_ixgbe_registed_num++].addr = pci_name(pdev);
 
-	if(pci_enable_device(pdev)){
-		printk(KERN_ERR "Cannot enable PCI device\n");
-		goto fail;
+	err = pci_enable_device_mem(pdev);
+	if(err)
+		return err;
+
+	if(!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))){
+		pci_using_dac = 1;
+	}
+	else{
+		err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+		if(err){
+			dev_err(&pdev->dev,
+				"No usable DMA configuration, aborting\n");
+			goto err_dma;
+		}
 	}
 
-	if(pci_request_regions(pdev, "ixgbe")){
-		printk(KERN_ERR "Cannot request regions\n");
-		goto fail_disable;
+	err = pci_request_mem_regions(pdev, ixgbe_driver_name);
+	if(err){
+		dev_err(&pdev->dev,
+			"pci_request_selected_regions failed 0x%x\n", err);
+		goto err_pci_reg;
 	}
 
 	pci_set_master(pdev);
+	pci_save_state(pdev);
 
 	/**
 	 * init eth dev, this is done in ix/ixgbe/ixgbe_ethdev.c
@@ -100,10 +118,11 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 
 	return 0;
 
-fail_disable:
-	pci_disable_device(pdev);
-fail:
-    return -ENODEV;
+err_pci_reg:
+err_dma:
+	if(!adapter || disable_dev)
+		pci_disable_device(pdev);
+	return err;
 }
 
 static void ixgbe_remove(struct pci_dev *pdev){
