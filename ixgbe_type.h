@@ -3075,20 +3075,20 @@ struct ixgbe_mac_info {
 };
 
 struct ixgbe_phy_info {
-	struct ixgbe_phy_operations ops;
-	enum ixgbe_phy_type type;
-	u32 addr;
-	u32 id;
-	enum ixgbe_sfp_type sfp_type;
-	bool sfp_setup_needed;
-	u32 revision;
-	enum ixgbe_media_type media_type;
-	bool reset_disable;
-	ixgbe_autoneg_advertised autoneg_advertised;
-	enum ixgbe_smart_speed smart_speed;
-	bool smart_speed_active;
-	bool multispeed_fiber;
-	bool reset_if_overtemp;
+	struct 						ixgbe_phy_operations ops;
+	enum 						ixgbe_phy_type type;
+	u32 						addr;
+	u32 						id;
+	enum 						ixgbe_sfp_type sfp_type;
+	bool 						sfp_setup_needed;
+	u32 						revision;
+	enum 						ixgbe_media_type media_type;
+	bool 						reset_disable;
+	ixgbe_autoneg_advertised 	autoneg_advertised;
+	enum 						ixgbe_smart_speed smart_speed;
+	bool 						smart_speed_active;
+	bool 						multispeed_fiber;
+	bool 						reset_if_overtemp;
 };
 
 #include "ixgbe_mbx.h"

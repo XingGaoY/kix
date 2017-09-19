@@ -1,5 +1,6 @@
 #include "ixgbe_phy.h"
 #include "ixgbe_api.h"
+#include "ixgbe_common.h"
 
 static void ixgbe_i2c_start(struct ixgbe_hw *hw);
 static void ixgbe_i2c_stop(struct ixgbe_hw *hw);

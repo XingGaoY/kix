@@ -10,3 +10,4 @@ Import ix to linux kernel as a module.
 
 # Questions
 - no netif_msg_init
+- no workqueue?

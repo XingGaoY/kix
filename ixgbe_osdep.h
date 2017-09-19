@@ -39,6 +39,8 @@
 #include <linux/delay.h>
 #include <asm/byteorder.h>
 
+#include "ixgbe_type.h"
+
 #define DELAY(x) udelay(x)
 #define usec_delay(x) DELAY(x)
 #define msec_delay(x) mdelay(x)
@@ -58,37 +60,6 @@ typedef uint32_t	u32;
 typedef int32_t		s32;
 typedef uint64_t	u64;
 
-#define IXGBE_PCI_REG(reg) (*((volatile uint32_t *)(reg)))
-
-static inline uint32_t ixgbe_read_addr(volatile void *addr)
-{
-	return IXGBE_PCI_REG(addr);
-}
-
-#define IXGBE_PCI_REG_WRITE(reg, value) do { \
-	IXGBE_PCI_REG((reg)) = (value); \
-} while(0)
-
-#define IXGBE_PCI_REG_ADDR(hw, reg) \
-	((volatile uint32_t *)((char *)(hw)->hw_addr + (reg)))
-
-#define IXGBE_PCI_REG_ARRAY_ADDR(hw, reg, index) \
-	IXGBE_PCI_REG_ADDR((hw), (reg) + ((index) << 2))
-
 /* Not implemented !! */
-#define IXGBE_READ_PCIE_WORD(hw, reg) 0	
+#define IXGBE_READ_PCIE_WORD(hw, reg) 0 
 #define IXGBE_WRITE_PCIE_WORD(hw, reg, value) do { } while(0)
-
-#define IXGBE_WRITE_FLUSH(a) IXGBE_READ_REG(a, IXGBE_STATUS)
-
-#define IXGBE_READ_REG(hw, reg) \
-	ixgbe_read_addr(IXGBE_PCI_REG_ADDR((hw), (reg)))
-
-#define IXGBE_WRITE_REG(hw, reg, value) \
-	IXGBE_PCI_REG_WRITE(IXGBE_PCI_REG_ADDR((hw), (reg)), (value))
-
-#define IXGBE_READ_REG_ARRAY(hw, reg, index) \
-	IXGBE_PCI_REG(IXGBE_PCI_REG_ARRAY_ADDR((hw), (reg), (index)))
-
-#define IXGBE_WRITE_REG_ARRAY(hw, reg, index, value) \
-	IXGBE_PCI_REG_WRITE(IXGBE_PCI_REG_ARRAY_ADDR((hw), (reg), (index)), (value))

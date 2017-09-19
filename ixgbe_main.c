@@ -19,6 +19,7 @@
 #include "ixgbe.h"
 #include "ixgbe_ethdev.h"
 #include "ixgbe_82599.h"
+#include "ixgbe_common.h"
 #include "pci.h"
 
 MODULE_LICENSE("GPL");
@@ -55,6 +56,57 @@ static const struct pci_device_id ixgbe_pci_tbl[] = {
 	{0, }
 };
 MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
+
+static void ixgbe_remove_adapter(struct ixgbe_hw *hw)
+{
+	if (!hw->hw_addr)
+		return;
+	hw->hw_addr = NULL;
+	printk(KERN_INFO "Adapter removed\n");
+}
+
+static void ixgbe_check_remove(struct ixgbe_hw *hw, u32 reg)
+{
+	u32 value;
+
+	/* The following check not only optimizes a bit by not
+	 * performing a read on the status register when the
+	 * register just read was a status register read that
+	 * returned IXGBE_FAILED_READ_REG. It also blocks any
+	 * potential recursion.
+	 */
+	if (reg == IXGBE_STATUS) {
+		ixgbe_remove_adapter(hw);
+		return;
+	}
+	value = ixgbe_read_reg(hw, IXGBE_STATUS);
+	if (value == IXGBE_FAILED_READ_REG)
+		ixgbe_remove_adapter(hw);
+}
+
+/**
+ * ixgbe_read_reg - Read from device register
+ * @hw: hw specific details
+ * @reg: offset of register to read
+ *
+ * Returns : value read or IXGBE_FAILED_READ_REG if removed
+ *
+ * This function is used to read device registers. It checks for device
+ * removal by confirming any read that returns all ones by checking the
+ * status register value for all ones. This function avoids reading from
+ * the hardware if a removal was previously detected in which case it
+ * returns IXGBE_FAILED_READ_REG (all ones).
+ */
+u32 ixgbe_read_reg(struct ixgbe_hw *hw, u32 reg)
+{
+	u8 __iomem *reg_addr = ACCESS_ONCE(hw->hw_addr);
+	u32 value;
+
+	value = readl(reg_addr + reg);
+	if (unlikely(value == IXGBE_FAILED_READ_REG))
+		ixgbe_check_remove(hw, reg);
+	return value;
+}
 
 /**
  * ixgbe_probe - Device Initialization Routine

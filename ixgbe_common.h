@@ -39,11 +39,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <linux/netdevice.h>
 
-#define IXGBE_WRITE_REG64(hw, reg, value) \
-	do { \
-		IXGBE_WRITE_REG(hw, reg, (u32) value); \
-		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32)); \
-	} while (0)
 struct ixgbe_pba {
 	u16 word[2];
 	u16 *pba_block;
@@ -155,9 +150,55 @@ void ixgbe_clear_tx_pending(struct ixgbe_hw *hw);
 
 extern s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw);
 
+#define IXGBE_FAILED_READ_REG 0xffffffffU
 
 #define ixgbe_hw_to_netdev(hw) (((struct ixgbe_adapter *)(hw)->back)->netdev)
 #define hw_dbg(hw, format, arg...) \
 	netdev_dbg(ixgbe_hw_to_netdev(hw), format, ## arg)
+
+static inline bool ixgbe_removed(void __iomem *addr)
+{
+  return unlikely(!addr);
+}
+
+static inline void ixgbe_write_reg(struct ixgbe_hw *hw, u32 reg, u32 value)
+{
+  u8 __iomem *reg_addr = ACCESS_ONCE(hw->hw_addr);
+
+  if (ixgbe_removed(reg_addr))
+    return;
+  writel(value, reg_addr + reg);
+}
+#define IXGBE_WRITE_REG(a, reg, value) ixgbe_write_reg((a), (reg), (value))
+
+#ifndef writeq
+#define writeq writeq
+static inline void writeq(u64 val, void __iomem *addr)
+{
+  writel((u32)val, addr);
+  writel((u32)(val >> 32), addr + 4);
+}
+#endif
+
+static inline void ixgbe_write_reg64(struct ixgbe_hw *hw, u32 reg, u64 value)
+{
+  u8 __iomem *reg_addr = ACCESS_ONCE(hw->hw_addr);
+
+  if (ixgbe_removed(reg_addr))
+    return;
+  writeq(value, reg_addr + reg);
+}
+#define IXGBE_WRITE_REG64(a, reg, value) ixgbe_write_reg64((a), (reg), (value))
+
+u32 ixgbe_read_reg(struct ixgbe_hw *hw, u32 reg);
+#define IXGBE_READ_REG(a, reg) ixgbe_read_reg((a), (reg))
+
+#define IXGBE_WRITE_REG_ARRAY(a, reg, offset, value) \
+    ixgbe_write_reg((a), (reg) + ((offset) << 2), (value))
+
+#define IXGBE_READ_REG_ARRAY(a, reg, offset) \
+    ixgbe_read_reg((a), (reg) + ((offset) << 2))
+
+#define IXGBE_WRITE_FLUSH(a) ixgbe_read_reg((a), IXGBE_STATUS)
 
 #endif /* IXGBE_COMMON */
