@@ -4,7 +4,8 @@ subdir-ccflags-y = -I$(PWD)/inc
 
 	obj-m			:= ixgbe.o
 
-ixgbe-objs	:= ixgbe_main.o
+ixgbe-objs	:= ixgbe_main.o ixgbe_82599.o ixgbe_phy.o\
+			   ixgbe_common.o ixgbe_api.o
 else
 	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 	PWD	  := $(shell pwd)

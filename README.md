@@ -7,3 +7,6 @@ Import ix to linux kernel as a module.
 ## DMA
 - Documentation/DMA-API-HOWTO.txt
 - https://blog.chinaunix.net/uid-20786208-id-5070005.html
+
+# Questions
+- no netif_msg_init

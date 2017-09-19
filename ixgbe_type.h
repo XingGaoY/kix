@@ -68,10 +68,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #define IXGBE_DEV_ID_82599_SFP_SF_QP     0x154A
 #define IXGBE_DEV_ID_82599_QSFP_SF_QP    0x1558
 
-enum ixgbe_boards {
-	board_82599,
-};
-
 /* General Registers */
 #define IXGBE_CTRL		0x00000
 #define IXGBE_STATUS		0x00008

@@ -11,10 +11,14 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/dma-mapping.h>
+#include <linux/aer.h>
+#include <linux/io.h>
+#include <linux/bitops.h>
 
 #include "ixgbe_type.h"
 #include "ixgbe.h"
 #include "ixgbe_ethdev.h"
+#include "ixgbe_82599.h"
 #include "pci.h"
 
 MODULE_LICENSE("GPL");
@@ -69,6 +73,7 @@ MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 	struct net_device *netdev;
 	struct ixgbe_adapter *adapter = NULL;
+	struct ixgbe_hw *hw;
 	unsigned int indices = MAX_TX_QUEUES;
 	int pci_using_dac, err;
 	bool disable_dev = false;
@@ -107,6 +112,8 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 		goto err_pci_reg;
 	}
 
+	pci_enable_pcie_error_reporting(pdev);
+
 	pci_set_master(pdev);
 	pci_save_state(pdev);
 
@@ -115,9 +122,39 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 	 * moved here for it is usually done in probe function
 	 */
 	netdev = alloc_etherdev_mq(sizeof(struct ixgbe_adapter), indices);
+	if(!netdev){
+		err = -ENOMEM;
+		goto err_alloc_etherdev;
+	}
+	SET_NETDEV_DEV(netdev, &pdev->dev);
+
+	adapter = netdev_priv(netdev);
+	adapter->netdev = netdev;
+	adapter->pdev = pdev;
+	hw = &adapter->hw;
+	hw->back = adapter;
+	hw->device_id = pdev->device;
+	hw->vendor_id = pdev->vendor;
+	printk(KERN_INFO "ixgbe: vendorID=0x%x deviceID=0x%x",
+		pdev->vendor, pdev->device);
+	//adapter->msg_enable
+
+	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
+		pci_resource_len(pdev,0));
+	if(!hw->hw_addr){
+		err = -EIO;
+		goto err_ioremap;
+	}
+
+	ixgbe_init_ops_82599(hw);
 
 	return 0;
 
+err_ioremap:
+	disable_dev = !test_and_set_bit(__IXGBE_DISABLED, &adapter->state);
+	free_netdev(netdev);
+err_alloc_etherdev:
+	pci_release_mem_regions(pdev);
 err_pci_reg:
 err_dma:
 	if(!adapter || disable_dev)

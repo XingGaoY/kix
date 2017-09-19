@@ -2,6 +2,8 @@
 #pragma once
 
 #include <linux/types.h>
+#include <linux/pci.h>
+#include <linux/netdevice.h>
 
 #include "ixgbe_type.h"
 #include "ixgbe_dcb.h"
@@ -105,6 +107,11 @@ struct ixgbe_uta_info {
  * Structure to store private data for each driver instance (for each port).
  */
 struct ixgbe_adapter {
+	unsigned long state;
+
+	struct net_device *netdev;
+	struct pci_dev *pdev;
+
 	struct ixgbe_hw             hw;
 	struct ixgbe_hw_stats       stats;
 	struct ixgbe_hw_fdir_info   fdir;
