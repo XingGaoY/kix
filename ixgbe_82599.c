@@ -9,6 +9,11 @@ static s32 ixgbe_setup_copper_link_82599(struct ixgbe_hw *hw,
 					 bool autoneg,
 					 bool autoneg_wait_to_complete);
 s32 ixgbe_verify_fw_version_82599(struct ixgbe_hw *hw);
+static s32 ixgbe_read_eeprom_82599(struct ixgbe_hw *hw,
+				   u16 offset, u16 *data);
+static s32 ixgbe_read_eeprom_buffer_82599(struct ixgbe_hw *hw, u16 offset,
+					  u16 words, u16 *data);
+
 s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw);
 bool ixgbe_verify_lesm_fw_enabled_82599(struct ixgbe_hw *hw);
 
@@ -177,6 +182,7 @@ int ixgbe_init_ops_82599(struct ixgbe_hw *hw){
 	int ret_val;
 	struct ixgbe_phy_info *phy = &hw->phy;
 	struct ixgbe_mac_info *mac = &hw->mac;
+	struct ixgbe_eeprom_info *eeprom = &hw->eeprom;
 
 	printk(KERN_INFO "ixgbe_init_ops_82599");
 
@@ -237,6 +243,14 @@ int ixgbe_init_ops_82599(struct ixgbe_hw *hw){
 				   IXGBE_FWSM_MODE_MASK) ? true : false;
 
 	hw->mbx.ops.init_params = ixgbe_init_mbx_params_pf;
+
+	/* EEPROM */
+	eeprom->ops.read = &ixgbe_read_eeprom_82599;
+	eeprom->ops.read_buffer = &ixgbe_read_eeprom_buffer_82599;
+
+	/* Manageability interface */
+	mac->ops.set_fw_drv_ver = &ixgbe_set_fw_drv_ver_generic;
+
 	return ret_val;
 }
 
@@ -1353,6 +1367,72 @@ bool ixgbe_verify_lesm_fw_enabled_82599(struct ixgbe_hw *hw)
 
 out:
 	return lesm_enabled;
+}
+
+/**
+ *  ixgbe_read_eeprom_buffer_82599 - Read EEPROM word(s) using
+ *  fastest available method
+ *
+ *  @hw: pointer to hardware structure
+ *  @offset: offset of  word in EEPROM to read
+ *  @words: number of words
+ *  @data: word(s) read from the EEPROM
+ *
+ *  Retrieves 16 bit word(s) read from EEPROM
+ **/
+static s32 ixgbe_read_eeprom_buffer_82599(struct ixgbe_hw *hw, u16 offset,
+					  u16 words, u16 *data)
+{
+	struct ixgbe_eeprom_info *eeprom = &hw->eeprom;
+	s32 ret_val = IXGBE_ERR_CONFIG;
+
+	printk(KERN_INFO "ixgbe_read_eeprom_buffer_82599");
+
+	/*
+	 * If EEPROM is detected and can be addressed using 14 bits,
+	 * use EERD otherwise use bit bang
+	 */
+	if ((eeprom->type == ixgbe_eeprom_spi) &&
+	    (offset + (words - 1) <= IXGBE_EERD_MAX_ADDR))
+		ret_val = ixgbe_read_eerd_buffer_generic(hw, offset, words,
+							 data);
+	else
+		ret_val = ixgbe_read_eeprom_buffer_bit_bang_generic(hw, offset,
+								    words,
+								    data);
+
+	return ret_val;
+}
+
+/**
+ *  ixgbe_read_eeprom_82599 - Read EEPROM word using
+ *  fastest available method
+ *
+ *  @hw: pointer to hardware structure
+ *  @offset: offset of  word in the EEPROM to read
+ *  @data: word read from the EEPROM
+ *
+ *  Reads a 16 bit word from the EEPROM
+ **/
+static s32 ixgbe_read_eeprom_82599(struct ixgbe_hw *hw,
+				   u16 offset, u16 *data)
+{
+	struct ixgbe_eeprom_info *eeprom = &hw->eeprom;
+	s32 ret_val = IXGBE_ERR_CONFIG;
+
+	printk(KERN_INFO "ixgbe_read_eeprom_82599");
+
+	/*
+	 * If EEPROM is detected and can be addressed using 14 bits,
+	 * use EERD otherwise use bit bang
+	 */
+	if ((eeprom->type == ixgbe_eeprom_spi) &&
+	    (offset <= IXGBE_EERD_MAX_ADDR))
+		ret_val = ixgbe_read_eerd_generic(hw, offset, data);
+	else
+		ret_val = ixgbe_read_eeprom_bit_bang_generic(hw, offset, data);
+
+	return ret_val;
 }
 
 /**
