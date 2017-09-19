@@ -2,6 +2,7 @@
 #include "ixgbe_phy.h"
 #include "ixgbe_common.h"
 #include "ixgbe_api.h"
+#include "ixgbe_mbx.h"
 
 static s32 ixgbe_setup_copper_link_82599(struct ixgbe_hw *hw,
 					 ixgbe_link_speed speed,
@@ -235,7 +236,7 @@ int ixgbe_init_ops_82599(struct ixgbe_hw *hw){
 	mac->arc_subsystem_valid = (IXGBE_READ_REG(hw, IXGBE_FWSM) &
 				   IXGBE_FWSM_MODE_MASK) ? true : false;
 
-	//hw->mbx.ops.init_params = ixgbe_init_mbx_params_pf;
+	hw->mbx.ops.init_params = ixgbe_init_mbx_params_pf;
 	return ret_val;
 }
 
