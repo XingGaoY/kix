@@ -7,6 +7,7 @@ static s32 ixgbe_setup_copper_link_82599(struct ixgbe_hw *hw,
 					 ixgbe_link_speed speed,
 					 bool autoneg,
 					 bool autoneg_wait_to_complete);
+s32 ixgbe_verify_fw_version_82599(struct ixgbe_hw *hw);
 s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw);
 bool ixgbe_verify_lesm_fw_enabled_82599(struct ixgbe_hw *hw);
 
@@ -48,6 +49,7 @@ void ixgbe_init_mac_link_ops_82599(struct ixgbe_hw *hw)
 int ixgbe_init_ops_82599(struct ixgbe_hw *hw){
 	int ret_val;
 	struct ixgbe_phy_info *phy = &hw->phy;
+	struct ixgbe_mac_info *mac = &hw->mac;
 
 	printk(KERN_INFO "ixgbe_init_ops_82599");
 
@@ -57,6 +59,24 @@ int ixgbe_init_ops_82599(struct ixgbe_hw *hw){
 	/* PHY */
 	phy->ops.identify = &ixgbe_identify_phy_82599;
 	phy->ops.init = &ixgbe_init_phy_ops_82599;
+
+	/* MAC */
+	mac->ops.reset_hw = &ixgbe_reset_hw_82599;
+	mac->ops.enable_relaxed_ordering = &ixgbe_enable_relaxed_ordering_gen2;
+	mac->ops.get_media_type = &ixgbe_get_media_type_82599;
+	mac->ops.get_supported_physical_layer =
+				    &ixgbe_get_supported_physical_layer_82599;
+	mac->ops.disable_sec_rx_path = &ixgbe_disable_sec_rx_path_generic;
+	mac->ops.enable_sec_rx_path = &ixgbe_enable_sec_rx_path_generic;
+	mac->ops.enable_rx_dma = &ixgbe_enable_rx_dma_82599;
+	mac->ops.read_analog_reg8 = &ixgbe_read_analog_reg8_82599;
+	mac->ops.write_analog_reg8 = &ixgbe_write_analog_reg8_82599;
+	mac->ops.start_hw = &ixgbe_start_hw_82599;
+	mac->ops.get_san_mac_addr = &ixgbe_get_san_mac_addr_generic;
+	mac->ops.set_san_mac_addr = &ixgbe_set_san_mac_addr_generic;
+	mac->ops.get_device_caps = &ixgbe_get_device_caps_generic;
+	mac->ops.get_wwn_prefix = &ixgbe_get_wwn_prefix_generic;
+	mac->ops.get_fcoe_boot_status = &ixgbe_get_fcoe_boot_status_generic;
 
 	return ret_val;
 }
@@ -108,6 +128,60 @@ s32 ixgbe_init_phy_ops_82599(struct ixgbe_hw *hw)
 	}
 init_phy_ops_out:
 	return ret_val;
+}
+
+/**
+ *  ixgbe_get_media_type_82599 - Get media type
+ *  @hw: pointer to hardware structure
+ *
+ *  Returns the media type (fiber, copper, backplane)
+ **/
+enum ixgbe_media_type ixgbe_get_media_type_82599(struct ixgbe_hw *hw)
+{
+	enum ixgbe_media_type media_type;
+
+	printk(KERN_INFO "ixgbe_get_media_type_82599");
+
+	/* Detect if there is a copper PHY attached. */
+	switch (hw->phy.type) {
+	case ixgbe_phy_cu_unknown:
+	case ixgbe_phy_tn:
+		media_type = ixgbe_media_type_copper;
+		goto out;
+	default:
+		break;
+	}
+
+	switch (hw->device_id) {
+	case IXGBE_DEV_ID_82599_KX4:
+	case IXGBE_DEV_ID_82599_KX4_MEZZ:
+	case IXGBE_DEV_ID_82599_COMBO_BACKPLANE:
+	case IXGBE_DEV_ID_82599_KR:
+	case IXGBE_DEV_ID_82599_BACKPLANE_FCOE:
+	case IXGBE_DEV_ID_82599_XAUI_LOM:
+		/* Default device ID is mezzanine card KX/KX4 */
+		media_type = ixgbe_media_type_backplane;
+		break;
+	case IXGBE_DEV_ID_82599_SFP:
+	case IXGBE_DEV_ID_82599_SFP_FCOE:
+	case IXGBE_DEV_ID_82599_SFP_EM:
+	case IXGBE_DEV_ID_82599_SFP_SF2:
+	case IXGBE_DEV_ID_82599_SFP_SF_QP:
+	case IXGBE_DEV_ID_82599EN_SFP:
+		media_type = ixgbe_media_type_fiber;
+		break;
+	case IXGBE_DEV_ID_82599_CX4:
+		media_type = ixgbe_media_type_cx4;
+		break;
+	case IXGBE_DEV_ID_82599_T3_LOM:
+		media_type = ixgbe_media_type_copper;
+		break;
+	default:
+		media_type = ixgbe_media_type_unknown;
+		break;
+	}
+out:
+	return media_type;
 }
 
 /**
@@ -668,6 +742,260 @@ static s32 ixgbe_setup_copper_link_82599(struct ixgbe_hw *hw,
 }
 
 /**
+ *  ixgbe_read_analog_reg8_82599 - Reads 8 bit Omer analog register
+ *  @hw: pointer to hardware structure
+ *  @reg: analog register to read
+ *  @val: read value
+ *
+ *  Performs read operation to Omer analog register specified.
+ **/
+s32 ixgbe_read_analog_reg8_82599(struct ixgbe_hw *hw, u32 reg, u8 *val)
+{
+	u32  core_ctl;
+
+	printk(KERN_INFO "ixgbe_read_analog_reg8_82599");
+
+	IXGBE_WRITE_REG(hw, IXGBE_CORECTL, IXGBE_CORECTL_WRITE_CMD |
+			(reg << 8));
+	IXGBE_WRITE_FLUSH(hw);
+	usec_delay(10);
+	core_ctl = IXGBE_READ_REG(hw, IXGBE_CORECTL);
+	*val = (u8)core_ctl;
+
+	return IXGBE_SUCCESS;
+}
+
+/**
+ *  ixgbe_write_analog_reg8_82599 - Writes 8 bit Omer analog register
+ *  @hw: pointer to hardware structure
+ *  @reg: atlas register to write
+ *  @val: value to write
+ *
+ *  Performs write operation to Omer analog register specified.
+ **/
+s32 ixgbe_write_analog_reg8_82599(struct ixgbe_hw *hw, u32 reg, u8 val)
+{
+	u32  core_ctl;
+
+	printk(KERN_INFO "ixgbe_write_analog_reg8_82599");
+
+	core_ctl = (reg << 8) | val;
+	IXGBE_WRITE_REG(hw, IXGBE_CORECTL, core_ctl);
+	IXGBE_WRITE_FLUSH(hw);
+	usec_delay(10);
+
+	return IXGBE_SUCCESS;
+}
+
+/**
+ *  ixgbe_start_hw_82599 - Prepare hardware for Tx/Rx
+ *  @hw: pointer to hardware structure
+ *
+ *  Starts the hardware using the generic start_hw function
+ *  and the generation start_hw function.
+ *  Then performs revision-specific operations, if any.
+ **/
+s32 ixgbe_start_hw_82599(struct ixgbe_hw *hw)
+{
+	s32 ret_val = IXGBE_SUCCESS;
+
+	printk(KERN_INFO "ixgbe_start_hw_82599");
+
+	ret_val = ixgbe_start_hw_generic(hw);
+	if (ret_val != IXGBE_SUCCESS)
+		goto out;
+
+	ret_val = ixgbe_start_hw_gen2(hw);
+	if (ret_val != IXGBE_SUCCESS)
+		goto out;
+
+	/* We need to run link autotry after the driver loads */
+	hw->mac.autotry_restart = true;
+
+	if (ret_val == IXGBE_SUCCESS)
+		ret_val = ixgbe_verify_fw_version_82599(hw);
+out:
+	return ret_val;
+}
+
+/**
+ *  ixgbe_reset_hw_82599 - Perform hardware reset
+ *  @hw: pointer to hardware structure
+ *
+ *  Resets the hardware by resetting the transmit and receive units, masks
+ *  and clears all interrupts, perform a PHY reset, and perform a link (MAC)
+ *  reset.
+ **/
+s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
+{
+	ixgbe_link_speed link_speed;
+	s32 status;
+	u32 ctrl, i, autoc, autoc2;
+	bool link_up = false;
+
+	printk(KERN_INFO "ixgbe_reset_hw_82599");
+
+	/* Call adapter stop to disable tx/rx and clear interrupts */
+	status = hw->mac.ops.stop_adapter(hw);
+	if (status != IXGBE_SUCCESS)
+		goto reset_hw_out;
+
+	/* flush pending Tx transactions */
+	ixgbe_clear_tx_pending(hw);
+
+	/* PHY ops must be identified and initialized prior to reset */
+
+	/* Identify PHY and related function pointers */
+	status = hw->phy.ops.init(hw);
+
+	if (status == IXGBE_ERR_SFP_NOT_SUPPORTED)
+		goto reset_hw_out;
+
+	/* Setup SFP module if there is one present. */
+	if (hw->phy.sfp_setup_needed) {
+		status = hw->mac.ops.setup_sfp(hw);
+		hw->phy.sfp_setup_needed = false;
+	}
+
+	if (status == IXGBE_ERR_SFP_NOT_SUPPORTED)
+		goto reset_hw_out;
+
+	/* Reset PHY */
+	if (hw->phy.reset_disable == false && hw->phy.ops.reset != NULL)
+		hw->phy.ops.reset(hw);
+
+mac_reset_top:
+	/*
+	 * Issue global reset to the MAC.  Needs to be SW reset if link is up.
+	 * If link reset is used when link is up, it might reset the PHY when
+	 * mng is using it.  If link is down or the flag to force full link
+	 * reset is set, then perform link reset.
+	 */
+	ctrl = IXGBE_CTRL_LNK_RST;
+	if (!hw->force_full_reset) {
+		hw->mac.ops.check_link(hw, &link_speed, &link_up, false);
+		if (link_up)
+			ctrl = IXGBE_CTRL_RST;
+	}
+
+	ctrl |= IXGBE_READ_REG(hw, IXGBE_CTRL);
+	IXGBE_WRITE_REG(hw, IXGBE_CTRL, ctrl);
+	IXGBE_WRITE_FLUSH(hw);
+
+	/* Poll for reset bit to self-clear indicating reset is complete */
+	for (i = 0; i < 10; i++) {
+		usec_delay(1);
+		ctrl = IXGBE_READ_REG(hw, IXGBE_CTRL);
+		if (!(ctrl & IXGBE_CTRL_RST_MASK))
+			break;
+	}
+
+	if (ctrl & IXGBE_CTRL_RST_MASK) {
+		status = IXGBE_ERR_RESET_FAILED;
+		printk(KERN_INFO "Reset polling failed to complete.\n");
+	}
+
+	msec_delay(50);
+
+	/*
+	 * Double resets are required for recovery from certain error
+	 * conditions.  Between resets, it is necessary to stall to allow time
+	 * for any pending HW events to complete.
+	 */
+	if (hw->mac.flags & IXGBE_FLAGS_DOUBLE_RESET_REQUIRED) {
+		hw->mac.flags &= ~IXGBE_FLAGS_DOUBLE_RESET_REQUIRED;
+		goto mac_reset_top;
+	}
+
+	/*
+	 * Store the original AUTOC/AUTOC2 values if they have not been
+	 * stored off yet.  Otherwise restore the stored original
+	 * values since the reset operation sets back to defaults.
+	 */
+	autoc = IXGBE_READ_REG(hw, IXGBE_AUTOC);
+	autoc2 = IXGBE_READ_REG(hw, IXGBE_AUTOC2);
+
+	/* Enable link if disabled in NVM */
+	if (autoc2 & IXGBE_AUTOC2_LINK_DISABLE_MASK) {
+		autoc2 &= ~IXGBE_AUTOC2_LINK_DISABLE_MASK;
+		IXGBE_WRITE_REG(hw, IXGBE_AUTOC2, autoc2);
+		IXGBE_WRITE_FLUSH(hw);
+	}
+
+	if (hw->mac.orig_link_settings_stored == false) {
+		hw->mac.orig_autoc = autoc;
+		hw->mac.orig_autoc2 = autoc2;
+		hw->mac.orig_link_settings_stored = true;
+	} else {
+		if (autoc != hw->mac.orig_autoc) {
+			/* Need SW/FW semaphore around AUTOC writes if LESM is
+			 * on, likewise reset_pipeline requires us to hold
+			 * this lock as it also writes to AUTOC.
+			 */
+			bool got_lock = false;
+			if (ixgbe_verify_lesm_fw_enabled_82599(hw)) {
+				status = hw->mac.ops.acquire_swfw_sync(hw,
+							IXGBE_GSSR_MAC_CSR_SM);
+				if (status != IXGBE_SUCCESS) {
+					status = IXGBE_ERR_SWFW_SYNC;
+					goto reset_hw_out;
+				}
+
+				got_lock = true;
+			}
+
+			IXGBE_WRITE_REG(hw, IXGBE_AUTOC, hw->mac.orig_autoc);
+			ixgbe_reset_pipeline_82599(hw);
+
+			if (got_lock)
+				hw->mac.ops.release_swfw_sync(hw,
+						      IXGBE_GSSR_MAC_CSR_SM);
+		}
+
+		if ((autoc2 & IXGBE_AUTOC2_UPPER_MASK) !=
+		    (hw->mac.orig_autoc2 & IXGBE_AUTOC2_UPPER_MASK)) {
+			autoc2 &= ~IXGBE_AUTOC2_UPPER_MASK;
+			autoc2 |= (hw->mac.orig_autoc2 &
+				   IXGBE_AUTOC2_UPPER_MASK);
+			IXGBE_WRITE_REG(hw, IXGBE_AUTOC2, autoc2);
+		}
+	}
+
+	/* Store the permanent mac address */
+	hw->mac.ops.get_mac_addr(hw, hw->mac.perm_addr);
+
+	/*
+	 * Store MAC address from RAR0, clear receive address registers, and
+	 * clear the multicast table.  Also reset num_rar_entries to 128,
+	 * since we modify this value when programming the SAN MAC address.
+	 */
+	hw->mac.num_rar_entries = 128;
+	hw->mac.ops.init_rx_addrs(hw);
+
+	/* Store the permanent SAN mac address */
+	hw->mac.ops.get_san_mac_addr(hw, hw->mac.san_addr);
+
+	/* Add the SAN MAC address to the RAR only if it's a valid address */
+	if (ixgbe_validate_mac_addr(hw->mac.san_addr) == 0) {
+		hw->mac.ops.set_rar(hw, hw->mac.num_rar_entries - 1,
+				    hw->mac.san_addr, 0, IXGBE_RAH_AV);
+
+		/* Save the SAN MAC RAR index */
+		hw->mac.san_mac_rar_index = hw->mac.num_rar_entries - 1;
+
+		/* Reserve the last RAR for the SAN MAC address */
+		hw->mac.num_rar_entries--;
+	}
+
+	/* Store the alternative WWNN/WWPN prefix */
+	hw->mac.ops.get_wwn_prefix(hw, &hw->mac.wwnn_prefix,
+				   &hw->mac.wwpn_prefix);
+
+reset_hw_out:
+	return status;
+}
+
+/**
  * ixgbe_reset_pipeline_82599 - perform pipeline reset
  *
  * @hw: pointer to hardware structure
@@ -719,6 +1047,55 @@ reset_pipeline_out:
 	IXGBE_WRITE_FLUSH(hw);
 
 	return ret_val;
+}
+
+/**
+ *  ixgbe_verify_fw_version_82599 - verify fw version for 82599
+ *  @hw: pointer to hardware structure
+ *
+ *  Verifies that installed the firmware version is 0.6 or higher
+ *  for SFI devices. All 82599 SFI devices should have version 0.6 or higher.
+ *
+ *  Returns IXGBE_ERR_EEPROM_VERSION if the FW is not present or
+ *  if the FW version is not supported.
+ **/
+s32 ixgbe_verify_fw_version_82599(struct ixgbe_hw *hw)
+{
+	s32 status = IXGBE_ERR_EEPROM_VERSION;
+	u16 fw_offset, fw_ptp_cfg_offset;
+	u16 fw_version = 0;
+
+	printk(KERN_INFO "ixgbe_verify_fw_version_82599");
+
+	/* firmware check is only necessary for SFI devices */
+	if (hw->phy.media_type != ixgbe_media_type_fiber) {
+		status = IXGBE_SUCCESS;
+		goto fw_version_out;
+	}
+
+	/* get the offset to the Firmware Module block */
+	hw->eeprom.ops.read(hw, IXGBE_FW_PTR, &fw_offset);
+
+	if ((fw_offset == 0) || (fw_offset == 0xFFFF))
+		goto fw_version_out;
+
+	/* get the offset to the Pass Through Patch Configuration block */
+	hw->eeprom.ops.read(hw, (fw_offset +
+				 IXGBE_FW_PASSTHROUGH_PATCH_CONFIG_PTR),
+				 &fw_ptp_cfg_offset);
+
+	if ((fw_ptp_cfg_offset == 0) || (fw_ptp_cfg_offset == 0xFFFF))
+		goto fw_version_out;
+
+	/* get the firmware version */
+	hw->eeprom.ops.read(hw, (fw_ptp_cfg_offset +
+			    IXGBE_FW_PATCH_VERSION_4), &fw_version);
+
+	if (fw_version > 0x5)
+		status = IXGBE_SUCCESS;
+
+fw_version_out:
+	return status;
 }
 
 /**
@@ -801,4 +1178,154 @@ s32 ixgbe_identify_phy_82599(struct ixgbe_hw *hw)
 
 out:
 	return status;
+}
+
+/**
+ *  ixgbe_get_supported_physical_layer_82599 - Returns physical layer type
+ *  @hw: pointer to hardware structure
+ *
+ *  Determines physical layer capabilities of the current configuration.
+ **/
+u32 ixgbe_get_supported_physical_layer_82599(struct ixgbe_hw *hw)
+{
+	u32 physical_layer = IXGBE_PHYSICAL_LAYER_UNKNOWN;
+	u32 autoc = IXGBE_READ_REG(hw, IXGBE_AUTOC);
+	u32 autoc2 = IXGBE_READ_REG(hw, IXGBE_AUTOC2);
+	u32 pma_pmd_10g_serial = autoc2 & IXGBE_AUTOC2_10G_SERIAL_PMA_PMD_MASK;
+	u32 pma_pmd_10g_parallel = autoc & IXGBE_AUTOC_10G_PMA_PMD_MASK;
+	u32 pma_pmd_1g = autoc & IXGBE_AUTOC_1G_PMA_PMD_MASK;
+	u16 ext_ability = 0;
+	u8 comp_codes_10g = 0;
+	u8 comp_codes_1g = 0;
+
+	printk(KERN_INFO "ixgbe_get_support_physical_layer_82599");
+
+	hw->phy.ops.identify(hw);
+
+	switch (hw->phy.type) {
+	case ixgbe_phy_tn:
+	case ixgbe_phy_cu_unknown:
+		hw->phy.ops.read_reg(hw, IXGBE_MDIO_PHY_EXT_ABILITY,
+		IXGBE_MDIO_PMA_PMD_DEV_TYPE, &ext_ability);
+		if (ext_ability & IXGBE_MDIO_PHY_10GBASET_ABILITY)
+			physical_layer |= IXGBE_PHYSICAL_LAYER_10GBASE_T;
+		if (ext_ability & IXGBE_MDIO_PHY_1000BASET_ABILITY)
+			physical_layer |= IXGBE_PHYSICAL_LAYER_1000BASE_T;
+		if (ext_ability & IXGBE_MDIO_PHY_100BASETX_ABILITY)
+			physical_layer |= IXGBE_PHYSICAL_LAYER_100BASE_TX;
+		goto out;
+	default:
+		break;
+	}
+
+	switch (autoc & IXGBE_AUTOC_LMS_MASK) {
+	case IXGBE_AUTOC_LMS_1G_AN:
+	case IXGBE_AUTOC_LMS_1G_LINK_NO_AN:
+		if (pma_pmd_1g == IXGBE_AUTOC_1G_KX_BX) {
+			physical_layer = IXGBE_PHYSICAL_LAYER_1000BASE_KX |
+			    IXGBE_PHYSICAL_LAYER_1000BASE_BX;
+			goto out;
+		} else
+			/* SFI mode so read SFP module */
+			goto sfp_check;
+		break;
+	case IXGBE_AUTOC_LMS_10G_LINK_NO_AN:
+		if (pma_pmd_10g_parallel == IXGBE_AUTOC_10G_CX4)
+			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_CX4;
+		else if (pma_pmd_10g_parallel == IXGBE_AUTOC_10G_KX4)
+			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_KX4;
+		else if (pma_pmd_10g_parallel == IXGBE_AUTOC_10G_XAUI)
+			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_XAUI;
+		goto out;
+		break;
+	case IXGBE_AUTOC_LMS_10G_SERIAL:
+		if (pma_pmd_10g_serial == IXGBE_AUTOC2_10G_KR) {
+			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_KR;
+			goto out;
+		} else if (pma_pmd_10g_serial == IXGBE_AUTOC2_10G_SFI)
+			goto sfp_check;
+		break;
+	case IXGBE_AUTOC_LMS_KX4_KX_KR:
+	case IXGBE_AUTOC_LMS_KX4_KX_KR_1G_AN:
+		if (autoc & IXGBE_AUTOC_KX_SUPP)
+			physical_layer |= IXGBE_PHYSICAL_LAYER_1000BASE_KX;
+		if (autoc & IXGBE_AUTOC_KX4_SUPP)
+			physical_layer |= IXGBE_PHYSICAL_LAYER_10GBASE_KX4;
+		if (autoc & IXGBE_AUTOC_KR_SUPP)
+			physical_layer |= IXGBE_PHYSICAL_LAYER_10GBASE_KR;
+		goto out;
+		break;
+	default:
+		goto out;
+		break;
+	}
+
+sfp_check:
+	/* SFP check must be done last since DA modules are sometimes used to
+	 * test KR mode -  we need to id KR mode correctly before SFP module.
+	 * Call identify_sfp because the pluggable module may have changed */
+	hw->phy.ops.identify_sfp(hw);
+	if (hw->phy.sfp_type == ixgbe_sfp_type_not_present)
+		goto out;
+
+	switch (hw->phy.type) {
+	case ixgbe_phy_sfp_passive_tyco:
+	case ixgbe_phy_sfp_passive_unknown:
+		physical_layer = IXGBE_PHYSICAL_LAYER_SFP_PLUS_CU;
+		break;
+	case ixgbe_phy_sfp_ftl_active:
+	case ixgbe_phy_sfp_active_unknown:
+		physical_layer = IXGBE_PHYSICAL_LAYER_SFP_ACTIVE_DA;
+		break;
+	case ixgbe_phy_sfp_avago:
+	case ixgbe_phy_sfp_ftl:
+	case ixgbe_phy_sfp_intel:
+	case ixgbe_phy_sfp_unknown:
+		hw->phy.ops.read_i2c_eeprom(hw,
+		      IXGBE_SFF_1GBE_COMP_CODES, &comp_codes_1g);
+		hw->phy.ops.read_i2c_eeprom(hw,
+		      IXGBE_SFF_10GBE_COMP_CODES, &comp_codes_10g);
+		if (comp_codes_10g & IXGBE_SFF_10GBASESR_CAPABLE)
+			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_SR;
+		else if (comp_codes_10g & IXGBE_SFF_10GBASELR_CAPABLE)
+			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_LR;
+		else if (comp_codes_1g & IXGBE_SFF_1GBASET_CAPABLE)
+			physical_layer = IXGBE_PHYSICAL_LAYER_1000BASE_T;
+		else if (comp_codes_1g & IXGBE_SFF_1GBASESX_CAPABLE)
+			physical_layer = IXGBE_PHYSICAL_LAYER_1000BASE_SX;
+		break;
+	default:
+		break;
+	}
+
+out:
+	return physical_layer;
+}
+
+/**
+ *  ixgbe_enable_rx_dma_82599 - Enable the Rx DMA unit on 82599
+ *  @hw: pointer to hardware structure
+ *  @regval: register value to write to RXCTRL
+ *
+ *  Enables the Rx DMA unit for 82599
+ **/
+s32 ixgbe_enable_rx_dma_82599(struct ixgbe_hw *hw, u32 regval)
+{
+
+	printk(KERN_INFO "ixgbe_enable_rx_dma_82599");
+
+	/*
+	 * Workaround for 82599 silicon errata when enabling the Rx datapath.
+	 * If traffic is incoming before we enable the Rx unit, it could hang
+	 * the Rx DMA unit.  Therefore, make sure the security engine is
+	 * completely disabled prior to enabling the Rx unit.
+	 */
+
+	hw->mac.ops.disable_sec_rx_path(hw);
+
+	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, regval);
+
+	hw->mac.ops.enable_sec_rx_path(hw);
+
+	return IXGBE_SUCCESS;
 }
