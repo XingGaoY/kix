@@ -20,6 +20,7 @@
 #include "ixgbe_ethdev.h"
 #include "ixgbe_82599.h"
 #include "ixgbe_common.h"
+#include "ixgbe_dcb.h"
 #include "pci.h"
 
 MODULE_LICENSE("GPL");
@@ -108,6 +109,40 @@ u32 ixgbe_read_reg(struct ixgbe_hw *hw, u32 reg)
 	return value;
 }
 
+static void ixgbe_dcb_init(struct ixgbe_hw *hw, struct ixgbe_dcb_config *dcb_config){
+	uint8_t i;
+	struct ixgbe_dcb_tc_config *tc;
+	uint8_t dcb_max_tc = IXGBE_DCB_MAX_TRAFFIC_CLASS;
+
+	dcb_config->num_tcs.pg_tcs = dcb_max_tc;
+	dcb_config->num_tcs.pfc_tcs = dcb_max_tc;
+	for (i = 0; i < dcb_max_tc; i++) {
+		tc = &dcb_config->tc_config[i];
+		tc->path[IXGBE_DCB_TX_CONFIG].bwg_id = i;
+		tc->path[IXGBE_DCB_TX_CONFIG].bwg_percent =
+				 (uint8_t)(100/dcb_max_tc + (i & 1));
+		tc->path[IXGBE_DCB_RX_CONFIG].bwg_id = i;
+		tc->path[IXGBE_DCB_RX_CONFIG].bwg_percent =
+				 (uint8_t)(100/dcb_max_tc + (i & 1));
+		tc->pfc = ixgbe_dcb_pfc_disabled;
+	}
+
+	/* Initialize default user to priority mapping, UPx->TC0 */
+	tc = &dcb_config->tc_config[0];
+	tc->path[IXGBE_DCB_TX_CONFIG].up_to_tc_bitmap = 0xFF;
+	tc->path[IXGBE_DCB_RX_CONFIG].up_to_tc_bitmap = 0xFF;
+	for (i = 0; i< IXGBE_DCB_MAX_BW_GROUP; i++) {
+		dcb_config->bw_percentage[IXGBE_DCB_TX_CONFIG][i] = 100;
+		dcb_config->bw_percentage[IXGBE_DCB_RX_CONFIG][i] = 100;
+	}
+	dcb_config->rx_pba_cfg = ixgbe_dcb_pba_equal;
+	dcb_config->pfc_mode_enable = false;
+	dcb_config->vt_mode = true;
+	dcb_config->round_robin_enable = false;
+	/* support all DCB capabilities in 82599 */
+	dcb_config->support.capabilities = 0xFF;
+}
+
 /**
  * ixgbe_probe - Device Initialization Routine
  * @pdev: PCI device information struct
@@ -126,6 +161,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 	struct net_device *netdev;
 	struct ixgbe_adapter *adapter = NULL;
 	struct ixgbe_hw *hw;
+	struct ixgbe_dcb_config *dcb_config;
 	unsigned int indices = MAX_TX_QUEUES;
 	int pci_using_dac, err;
 	bool disable_dev = false;
@@ -199,6 +235,10 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent){
 	}
 
 	ixgbe_init_ops_82599(hw);
+
+	dcb_config = &adapter->dcb_config;
+	memset(dcb_config, 0, sizeof(struct ixgbe_dcb_config));
+	ixgbe_dcb_init(hw, dcb_config);
 
 	return 0;
 
