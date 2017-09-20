@@ -42,6 +42,26 @@
 #define MAX_TX_QUEUES	64
 
 /*
+ * High threshold controlling when to start sending XOFF frames. Must be at
+ * least 8 bytes less than receive packet buffer size. This value is in units
+ * of 1024 bytes.
+ */
+#define IXGBE_FC_HI    0x80
+
+/*
+ * Low threshold controlling when to start sending XON frames. This value is
+ * in units of 1024 bytes.
+ */
+#define IXGBE_FC_LO    0x40
+
+/* Timer value included in XOFF frames. */
+#define IXGBE_FC_PAUSE 0x680
+
+#define IXGBE_LINK_DOWN_CHECK_TIMEOUT 4000 /* ms */
+#define IXGBE_LINK_UP_CHECK_TIMEOUT   1000 /* ms */
+#define IXGBE_VMDQ_NUM_UC_MAC         4096 /* Maximum nb. of UC MAC addr. */
+
+/*
  * Information about the fdir mode.
  */
 struct ixgbe_hw_fdir_info {
@@ -252,3 +272,8 @@ void ixgbe_pf_host_init(struct rte_eth_dev *eth_dev);
 void ixgbe_pf_mbx_process(struct rte_eth_dev *eth_dev);
 
 int ixgbe_pf_host_configure(struct rte_eth_dev *eth_dev);
+
+void ixgbe_irq_enable(struct rte_eth_dev *dev);
+void ixgbe_irq_disable(struct ixgbe_hw *hw);
+
+void netdev_init(struct rte_eth_dev *netdev, struct pci_dev *pdev);
