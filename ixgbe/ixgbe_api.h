@@ -37,12 +37,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "ixgbe_type.h"
 #ident "$Id: ixgbe_api.h,v 1.115 2012/08/23 23:30:15 jtkirshe Exp $"
 
-s32 ixgbe_init_shared_code(struct ixgbe_hw *hw);
-
-extern s32 ixgbe_init_ops_82598(struct ixgbe_hw *hw);
 extern s32 ixgbe_init_ops_82599(struct ixgbe_hw *hw);
-extern s32 ixgbe_init_ops_X540(struct ixgbe_hw *hw);
-extern s32 ixgbe_init_ops_vf(struct ixgbe_hw *hw);
 
 s32 ixgbe_set_mac_type(struct ixgbe_hw *hw);
 s32 ixgbe_init_hw(struct ixgbe_hw *hw);

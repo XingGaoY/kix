@@ -152,9 +152,8 @@ extern s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw);
 
 #define IXGBE_FAILED_READ_REG 0xffffffffU
 
-#define ixgbe_hw_to_netdev(hw) (((struct ixgbe_adapter *)(hw)->back)->netdev)
 #define hw_dbg(hw, format, arg...) \
-	netdev_dbg(ixgbe_hw_to_netdev(hw), format, ## arg)
+	printk(KERN_DEBUG format, ## arg)
 
 static inline bool ixgbe_removed(void __iomem *addr)
 {
