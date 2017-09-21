@@ -11,3 +11,4 @@ Import ix to linux kernel as a module.
 # Questions
 - no netif_msg_init
 - no workqueue?
+- hugepg? whether the 1Gb position is locked, and still available after the user app is stopped?
