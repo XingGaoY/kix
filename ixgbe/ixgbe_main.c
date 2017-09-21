@@ -1,11 +1,10 @@
+#include <linux/module.h>
+
 /**
  * Modified from ix/igb_stub/igb_stub.c
  * Maybe need to check linux/ixgbe driver to complete it
  * Removed all the other codes irrelevant with 82599 to make it easy to read
  */
-
-#include <linux/init.h>
-#include <linux/module.h>
 
 #include <linux/pci.h>		// for pci structures
 #include <linux/etherdevice.h>
@@ -15,13 +14,14 @@
 #include <linux/bitops.h>
 
 #include "ixgbe_type.h"
-#include "ixgbe.h"
+#include <ixgbe/ixgbe.h>
 #include "ixgbe_ethdev.h"
 #include "ixgbe_82599.h"
 #include "ixgbe_common.h"
 #include "ixgbe_dcb.h"
 #include "ixgbe_api.h"
 #include <ix/pci.h>
+#include <ixgbe/ixgbe.h>
 
 MODULE_LICENSE("GPL");
 
@@ -375,7 +375,7 @@ static struct pci_driver ixgbe_driver = {
 	.remove   = ixgbe_remove,
 };
 
-static int __init ixgbe_init_module(void){
+int ixgbe_init(void){
 	int ret = 0;
 	printk(KERN_INFO "ixgbe driver loaded");
 
@@ -384,10 +384,7 @@ static int __init ixgbe_init_module(void){
 	return ret;
 }
 
-static void __exit ixgbe_exit_module(void){
+void ixgbe_exit(void){
 	printk(KERN_INFO "ixgbe driver removed");
 	pci_unregister_driver(&ixgbe_driver);
 }
-
-module_init(ixgbe_init_module);
-module_exit(ixgbe_exit_module);

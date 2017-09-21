@@ -23,4 +23,7 @@ enum ixgbe_boards {
 
 //extern const struct ixgbe_info ixgbe_82599_info;
 
+int ixgbe_init(void);
+void ixgbe_exit(void);
+
 #endif /* _IXGBE_H_ */
