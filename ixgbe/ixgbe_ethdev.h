@@ -7,7 +7,7 @@
 
 #include "ixgbe_type.h"
 #include "ixgbe_dcb.h"
-#include <ix/net/ethdev.h>
+#include <ix/ethdev.h>
 
 /* need update link, bit flag */
 #define IXGBE_FLAG_NEED_LINK_UPDATE (uint32_t)(1 << 0)

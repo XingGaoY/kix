@@ -1,7 +1,7 @@
 #include "ixgbe_ethdev.h"
 #include "ixgbe_common.h"
 #include "ixgbe_api.h"
-#include <ix/net/ethdev.h>
+#include <ix/ethdev.h>
 
 #include <linux/errno.h>
 #include <linux/spinlock.h>

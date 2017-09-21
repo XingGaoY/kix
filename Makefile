@@ -6,8 +6,10 @@ ifneq ($(KERNELRELEASE),)
 					   ixgbe/ixgbe_phy.o ixgbe/ixgbe_common.o ixgbe/ixgbe_api.o 	\
 					   ixgbe/ixgbe_mbx.o ixgbe/ixgbe_dcb.o ixgbe/ixgbe_dcb_82599.o
 
+	ix_objs 		:= ix/core/ethdev.o ix/core/toeplitz.o
+
 	obj-m 			+=  kix.o
-	kix-objs		:=	init.o $(ixgbe_objs)
+	kix-objs		:=	init.o $(ixgbe_objs) $(ix_objs)
 else
 	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 	PWD	 := 	$(shell pwd)
